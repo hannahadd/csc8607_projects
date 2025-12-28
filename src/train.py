@@ -112,7 +112,9 @@ def main():
         val_loader = DataLoader(subset, batch_size=bs, shuffle=False, num_workers=nw, pin_memory=pin)
 
     # Model
-    model = build_model(config).to(device)
+    model = build_model(config, num_classes=meta["num_classes"]).to(device)
+    train_loader, val_loader, test_loader, meta = get_dataloaders(config)
+
 
     # Loss/optim
     criterion = nn.CrossEntropyLoss()
