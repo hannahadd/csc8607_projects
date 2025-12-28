@@ -1,73 +1,62 @@
-# Fichier de configuration générique (à adapter au projet)
 dataset:
-  name: TODO                # ex: "CIFAR10", "IMDB", ...
-  root: "./data"            # chemin local pour les données
-  split:                    # optionnel : noms/tailles de splits
-    train: TODO
-    val: TODO
-    test: TODO
-  download: true            # si supporté
-  num_workers: 4
-  shuffle: true
+  name: "ESC-50"
+  root: "./data/esc50"
+  annotation_csv: "./data/esc50/meta/esc50.csv"
+  audio_dir: "./data/esc50/audio"
+  # Splits recommandés (folds 1..5). On fera:
+  # train = folds [1,2,3], val = [4], test = [5]
+  split:
+    train_folds: [1, 2, 3]
+    val_folds: [4]
+    test_folds: [5]
 
 preprocess:
-  # transformations de base (ex: resize, normalize)
-  resize:                   # ex: [32, 32] ou null
-  normalize:                # ex: {"mean": [0.5,0.5,0.5], "std":[0.5,0.5,0.5]} ou null
-  text_tokenizer:           # pour NLP : nom ou paramètres, sinon null
+  # Audio -> log-mel spectrogram (image 1x64xT)
+  sample_rate: 16000
+  mono: true
+  n_mels: 64
+  n_fft: 400
+  win_length: 400
+  hop_length: 160
+  to_db: true
+  # Normalisation (on la fera proprement dans preprocessing.py)
+  normalize: "per_feature"   # (ex: mean/std sur l'axe temps)
 
 augment:
-  # data augmentation (laisser null si non utilisée)
-  random_flip:              # true/false
-  random_crop:              # paramètres ou null
-  color_jitter:             # paramètres ou null
-  spec_augment:             # pour audio : paramètres ou null
+  enabled: true
+  # SpecAugment léger (train only)
+  freq_mask:
+    enabled: true
+    max_width: 8
+    num_masks: 1
+    p: 0.5
+  time_mask:
+    enabled: true
+    max_width: 20
+    num_masks: 1
+    p: 0.5
+  time_shift:
+    enabled: true
+    max_shift_pct: 0.05
+    p: 0.3
 
 model:
-  type: TODO                # ex: "resnet18", "mlp", "lstm", ...
-  num_classes: TODO
-  input_shape:              # ex: [3, 32, 32] ou null
-  hidden_sizes:             # ex: [256, 128] ou null
-  activation: relu          # ex: relu, gelu, tanh...
-  dropout: 0.0              # ex: 0.0–0.5
-  batch_norm: false         # true/false
-  residual: false           # true/false
-  attention: false          # true/false
-  rnn:                      # pour RNN/LSTM/GRU : paramètres ou null
-    type: null              # lstm/gru
-    hidden_size: null
-    num_layers: null
-    bidirectional: false
+  type: "cnn2d_esc50"
+  num_classes: 50
+  # Hyperparams modèle (ceux imposés)
+  channels: [32, 64, 128]     # ou [48, 96, 192]
+  kernel_size: 3              # ou 5
 
 train:
   seed: 42
-  device: auto              # "cpu", "cuda", ou "auto"
   batch_size: 64
-  epochs: 10
-  max_steps: null           # entier ou null
-  overfit_small: false      # true pour sur-apprendre sur un petit échantillon
-
-  optimizer:
-    name: adam              # sgd/adam/rmsprop
-    lr: 0.001
-    weight_decay: 0.0
-    momentum: 0.9           # utile si SGD
-
-  scheduler:
-    name: none              # none/step/cosine/onecycle
-    step_size: 10
-    gamma: 0.1
-    warmup_steps: 0
+  num_workers: 4
+  epochs: 20
+  lr: 1e-3
+  weight_decay: 1e-4
 
 metrics:
-  classification:           # ex: ["accuracy", "f1"]
-    - accuracy
-  regression: []            # ex: ["mae", "rmse"]
-
-hparams:                    # espace pour mini grid search
-  lr: [0.0005, 0.001, 0.005]
-  batch_size: [32, 64]
-  weight_decay: [0.0, 0.0005]
+  main: "accuracy"
 
 paths:
   runs_dir: "./runs"

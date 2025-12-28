@@ -13,3 +13,23 @@ artifacts/
 .DS_Store
 .vscode/
 .idea/
+
+# Data & logs
+data/
+runs/
+
+# Artifacts: on ignore tout sauf ce qu'on veut rendre
+artifacts/*
+!artifacts/best.ckpt
+!artifacts/*.png
+!artifacts/*.jpg
+!artifacts/*.jpeg
+!artifacts/*.yaml
+!artifacts/.gitkeep
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.env
+.DS_Store
