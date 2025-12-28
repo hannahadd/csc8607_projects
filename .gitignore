@@ -18,14 +18,12 @@ artifacts/
 data/
 runs/
 
-# Artifacts: on ignore tout sauf ce qu'on veut rendre
+# ignore everything in artifacts…
 artifacts/*
+# …but keep the required checkpoint
+!artifacts/
 !artifacts/best.ckpt
-!artifacts/*.png
-!artifacts/*.jpg
-!artifacts/*.jpeg
-!artifacts/*.yaml
-!artifacts/.gitkeep
+
 
 # Python
 __pycache__/
