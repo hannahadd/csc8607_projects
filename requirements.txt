@@ -5,4 +5,4 @@ torchtext
 tensorboard
 pyyaml
 tqdm
-numpy
+numpysoundfile
