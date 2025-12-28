@@ -62,3 +62,20 @@ metrics:
 paths:
   runs_dir: "./runs"
   artifacts_dir: "./artifacts"
+
+lr_finder:
+  lr_start: 1e-6
+  lr_end: 1.0
+  num_iters: 200
+
+grid_search:
+  epochs: 3
+  seed: 42
+
+hparams:
+  lr: [5.0e-3, 1.0e-2, 2.0e-2]
+  weight_decay: [1.0e-5, 1.0e-4]
+  channels:
+    - [32, 64, 128]
+    - [48, 96, 192]
+  kernel_size: [3, 5]
