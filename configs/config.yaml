@@ -50,10 +50,11 @@ model:
 train:
   seed: 42
   batch_size: 64
-  num_workers: 4
+  num_workers: 0
   epochs: 20
   lr: 1e-3
   weight_decay: 1e-4
+  overfit_n: 32
 
 metrics:
   main: "accuracy"
