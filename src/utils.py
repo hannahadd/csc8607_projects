@@ -26,3 +26,6 @@ def count_parameters(model) -> int:
 def save_config_snapshot(config: dict, out_dir: str) -> None:
     """Sauvegarde une copie de la config (ex: YAML) dans out_dir. À implémenter."""
     raise NotImplementedError("save_config_snapshot doit être implémentée par l'étudiant·e.")
+
+def count_parameters(model):
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
