@@ -13,7 +13,7 @@
 - **Étudiant·e** : HADDAOU Hanna
 - **Projet** : Projet 15, ESC-50 (50 classes) avec CNN 2D sur spectrogrammes log-mel
 - **Dépôt Git** : https://github.com/hannahadd/csc8607_projects
-- **Environnement** : python == 3.11, torch == ..., torchaudio == ..., cuda == False (local Mac / MPS)
+- **Environnement** : python -c "import torch, torchaudio; print('torch', torch.__version__); print('torchaudio', torchaudio.__version__)"
 - **Commandes utilisées** :
   - Entraînement : python -m src.train --config configs/config.yaml
   - LR finder : python -m src.lr_finder --config configs/config.yaml
@@ -135,23 +135,27 @@ Le test est quasiment équilibré (la classe la plus fréquente ne représente q
 
 - **Description couche par couche** (ordre exact, tailles, activations, normalisations, poolings, résiduels, etc.) :
   - Input → …
-  - Stage 1 (répéter N₁ fois) : …
-  - Stage 2 (répéter N₂ fois) : …
-  - Stage 3 (répéter N₃ fois) : …
-  - Tête (GAP / linéaire) → logits (dimension = nb classes)
+  - Stage 1 (répéter N₁ fois) : Conv2d(1 → 32, kernel_size=5×5, stride=1, padding=2) → BatchNorm2d(32) → ReLU → MaxPool2d(2×2)
+  - Stage 2 (répéter N₂ fois) : Conv2d(32 → 64, kernel_size=5×5, stride=1, padding=2) → BatchNorm2d(64) → ReLU → MaxPool2d(2×2)
+  - Stage 3 (répéter N₃ fois) : Conv2d(64 → 128, kernel_size=5×5, stride=1, padding=2) → BatchNorm2d(128) → ReLU
+  - Tête (GAP / linéaire) → logits (dimension = nb classes) AdaptiveAvgPool2d(output_size=1×1) → Flatten → Linear(128 → 50) → logits (dimension = 50 classes)
 
 - **Loss function** :
   - Multi-classe : CrossEntropyLoss
   - Multi-label : BCEWithLogitsLoss
   - (autre, si votre tâche l’impose)
 
-- **Sortie du modèle** : forme = __(batch_size, num_classes)__ (ou __(batch_size, num_attributes)__)
+- **Sortie du modèle** : forme = (batch_size, num_classes) = (batch_size, 50)
 
-- **Nombre total de paramètres** : `_____`
+- **Nombre total de paramètres** : `263922`
 
 **M1.** Décrivez l’**architecture** complète et donnez le **nombre total de paramètres**.  
-Expliquez le rôle des **2 hyperparamètres spécifiques au modèle** (ceux imposés par votre sujet).
+Le modèle est un CNN 2D simple appliqué aux spectrogrammes log-mel : trois blocs convolutionnels (Conv2d + BatchNorm + ReLU, avec MaxPool sur les deux premiers blocs), suivis d’un global average pooling et d’une couche linéaire produisant 50 logits.
+Le nombre total de paramètres pour la configuration finale (channels=[32,64,128], kernel_size=5) est 263,922.
 
+Expliquez le rôle des **2 hyperparamètres spécifiques au modèle** (ceux imposés par votre sujet).
+- channels (ex. [32, 64, 128]) : contrôle la capacité du réseau (nombre de filtres par bloc). Plus de canaux → représentation plus riche, mais plus de paramètres et risque d’overfit/temps de calcul plus élevé.
+- kernel_size (ici 5) : contrôle le champ réceptif des convolutions (taille des motifs temps/fréquence capturés dans le spectrogramme). Un kernel plus grand agrège plus de contexte local, ce qui peut améliorer la robustesse mais augmente aussi le coût et peut lisser des détails fins.
 
 ### 2.3 Perte initiale & premier batch
 
@@ -212,10 +216,10 @@ La loss diminue nettement quand le LR passe dans la zone ~1e-3–1e-2 et atteint
 
 - **Durée des runs** : `3` époques par run (1–5 selon dataset), même seed (42)
 
-| Run (nom explicite) | LR    | WD     | Hyp-A | Hyp-B | Val metric (nom=_____) | Val loss | Notes |
+| Run (nom explicite) | LR    | WD     | Hyp-A | Hyp-B | Val metric (nom=accuracy) | Val loss | Notes |
 |---------------------|-------|--------|-------|-------|-------------------------|----------|-------|
-|                     |       |        |       |       |                         |          |       |
-|                     |       |        |       |       |                         |          |       |
+|         run18_k5_ch32-64-128_lr2p00e-02_wd1p00e-05            |   0.02    |     1e-05   |    [32, 64, 128]   |    5   |              0.1725           |          |  Meilleur run du grid search (3 époques).     |
+|            run02_k5_ch32-64-128_lr5p00e-03_wd1p00e-05   |    0.005   |     1e-05   |    [32, 64, 128]   |     5  |          0.1700               |          |     Très proche du meilleur ; LR plus faible, perf quasi identique.  |
 
 > _Insérer capture TensorBoard (onglet HParams/Scalars) ou tableau récapitulatif._
 
@@ -260,10 +264,11 @@ En résumé, sur ce mini grid search (3 époques), la meilleure perf validation 
 
 Best val acc = 0.3425 (epoch 14)
 Train acc fin = 0.4233
-Commentaire (2–3 lignes) :
-“train_loss baisse régulièrement, val_accuracy monte puis oscille, écart train/val modéré → apprentissage réel mais généralisation limitée.”
+
+Train_loss baisse régulièrement, val_accuracy monte puis oscille, écart train/val modéré → apprentissage réel mais généralisation limitée.
 
 **M6.** Montrez les **courbes train/val** (loss + métrique). Interprétez : sous-apprentissage / sur-apprentissage / stabilité d’entraînement.
+Sur 15 époques, la loss d’entraînement diminue de façon régulière et l’accuracy train monte jusqu’à ~0.42, tandis que l’accuracy validation atteint ~0.34 (max à l’epoch 14) puis oscille légèrement. L’écart train/val reste modéré : il n’y a pas de sur-apprentissage massif, mais la généralisation reste limitée (probable sous-entraînement/optimisation perfectible). L’entraînement est globalement stable, malgré un pic de val_loss au tout début.
 
 ---
 
@@ -272,11 +277,38 @@ Commentaire (2–3 lignes) :
 > _Superposez plusieurs runs dans TensorBoard et insérez 2–3 captures :_
 
 - **Variation du LR** (impact au début d’entraînement)
+
+
+![alt text](image-10.png)
+![alt text](image-11.png)
+
+![alt text](image-12.png)
+![alt text](image-13.png)
+
+Un LR plus élevé accélère la baisse de train/loss au début, mais rend la validation plus instable (oscillations/val_loss plus bruitée).
+
 - **Variation du weight decay** (écart train/val, régularisation)
+
+![alt text](image-14.png)
+
+Train/loss : les deux courbes sont quasi superposées, le WD ne change pas beaucoup la descente de loss sur le train à ce stade.
+Val/accuracy : la courbe wd=1e-05 (bleu) est légèrement au-dessus de wd=1e-04 (orange), surtout à l’epoch 2–3 (différence faible mais visible).
+Val/loss : très proche aussi, s’il y a une différence, elle est minime (même tendance que l’accuracy : wd plus faible un tout petit peu meilleur ici).
+En passant de WD=1e-5 à WD=1e-4, le train converge légèrement moins vite mais la validation devient plus stable et l’écart train/val se réduit, signe d’une meilleure régularisation sur un entraînement long (ici, 15 époques).
+
+
 - **Variation des 2 hyperparamètres de modèle** (convergence, plateau, surcapacité)
 
-**M7.** Trois **comparaisons** commentées (une phrase chacune) : LR, weight decay, hyperparamètres modèle — ce que vous attendiez vs. ce que vous observez.
+![alt text](image-15.png)
 
+À LR/WD/channels fixés, k=3 converge légèrement plus vite (train/loss plus bas), mais la validation plafonne plus tôt. k=5 reste stable et améliore légèrement la val/accuracy en fin de run, ce qui suggère un meilleur compromis généralisation/stabilité, avec un champ réceptif plus large.
+
+**M7.** Trois **comparaisons** commentées (une phrase chacune) : LR, weight decay, hyperparamètres modèle — ce que vous attendiez vs. ce que vous observez.
+- LR : Attendu : un LR plus grand accélère la convergence mais devient instable s’il est trop élevé ; observé : les runs avec LR plus élevé descendent plus vite en train/loss, mais au-delà d’une certaine valeur la validation plafonne/est moins stable, donc un LR intermédiaire est le meilleur compromis.
+
+- Weight decay : Attendu : augmenter WD régularise (moins d’overfit) mais peut ralentir l’apprentissage ; observé : wd=1e-4 rend l’entraînement un peu plus “conservateur” tandis que wd=1e-5 optimise mieux à court terme, et sur un entraînement plus long WD plus élevé aide surtout à réduire l’écart train/val quand l’overfit apparaît.
+
+- Hyperparamètres modèle (channels / kernel_size) : Attendu : plus de capacité (channels↑, kernel↑) apprend plus vite mais peut sur-ajuster ; observé : k=5 est légèrement plus stable et finit avec une meilleure val/accuracy que k=3 (qui fit un peu mieux le train mais plafonne en val), et une capacité trop grande n’apporte pas toujours de gain immédiat sur la validation.
 ---
 
 ## 8) Itération supplémentaire (si temps)
@@ -292,26 +324,93 @@ Commentaire (2–3 lignes) :
 
 - **Checkpoint évalué** : `artifacts/best.ckpt`
 - **Métriques test** :
-  - Metric principale (nom = `_____`) : `_____`
-  - Metric(s) secondaire(s) : `_____`
+  - Metric principale (nom = `accuracy`) : `0.29`
+  - Metric(s) secondaire(s) : ``
 
 **M9.** Donnez les **résultats test** et comparez-les à la validation (écart raisonnable ? surapprentissage probable ?).
 
----
+(csc8607_esc50) hanna@MacBook-Air-de-Hanna csc8607_esc50 % python -m src.evaluate --config configs/final.yaml --checkpoint artifacts/best.ckpt
+
+device: mps
+num_classes: 50 input_shape: (1, 64, 501)
+TEST size: 400
+checkpoint: artifacts/best.ckpt
+/opt/anaconda3/envs/csc8607_esc50/lib/python3.11/site-packages/torch/utils/data/dataloader.py:692: UserWarning: 'pin_memory' argument is set as true but not supported on MPS now, device pinned memory won't be used.
+  warnings.warn(warn_msg)
+test_loss: 2.6060
+test_accuracy: 0.2900
+
+Sur le split test, le modèle atteint 29.0% d’accuracy (loss = 2.606). C’est inférieur à la meilleure accuracy validation (34.25%), ce qui indique un écart de généralisation modéré (≈ 5 points). Cet écart est cohérent avec les courbes observées : le modèle apprend (bien au-dessus de la baseline 2%), mais la performance reste limitée sur des exemples non vus, suggérant un entraînement/optimisation encore perfectible plutôt qu’un sur-apprentissage extrême.
+
 
 ## 10) Limites, erreurs & bug diary (court)
 
 - **Limites connues** (données, compute, modèle) :
-- **Erreurs rencontrées** (shape mismatch, divergence, NaN…) et **solutions** :
-- **Idées « si plus de temps/compute »** (une phrase) :
 
+Données : ESC-50 est un dataset petit (2 000 clips, 50 classes → 40 exemples/classe), donc la variance est élevée et la généralisation difficile sans augmentation/regularisation.
+Compute : entraînements effectués sur Apple MPS (pas GPU CUDA) → exploration hyperparamètres plus limitée en temps.
+Modèle : CNN 2D simple (3 blocs + GAP) sur log-mel ; capacité et inductive bias limités par rapport à des architectures audio plus avancées (hors sujet).
+
+- **Erreurs rencontrées** (shape mismatch, divergence, NaN…) et **solutions** :
+- Lors du chargement des fichiers audio, torchaudio.load a échoué avec l’erreur “TorchCodec required” ; j’ai donc remplacé le chargement par soundfile, ce qui a permis de lire correctement les WAV sur mon environnement.
+- L’utilisation du DataLoader en multiprocess a provoqué l’erreur “Can’t pickle local object … preprocess” ; j’ai corrigé le problème en rendant les fonctions/transforms picklables et, sur macOS, en utilisant num_workers=0 lorsque nécessaire.
+- Une erreur d’import ModuleNotFoundError: src.preprocessing venait d’un fichier mal nommé ; j’ai renommé le fichier en preprocessing.py et ajouté src/__init__.py pour garantir le bon fonctionnement des imports du module src.
+- Enfin, j’ai rencontré un KeyError: num_classes car la valeur n’était pas définie dans le YAML ; j’ai donc récupéré num_classes depuis meta (dérivé des données) et l’ai passé explicitement à build_model afin d’éviter toute dépendance à une clé manquante dans la configuration.
+
+- **Idées « si plus de temps/compute »** (une phrase) :
+Tester une itération M8 avec SpecAugment léger, ajustement LR/WD et entraînement plus long (20 époques), voire capacité plus grande (channels) pour améliorer la généralisation.
 ---
 
 ## 11) Reproductibilité
 
-- **Seed** : `_____`
+- **Seed** : `42`
 - **Config utilisée** : joindre un extrait de `configs/config.yaml` (sections pertinentes)
+dataset:
+  name: "ESC-50"
+  root: "./data/esc50"
+  split:
+    train_folds: [1, 2, 3]
+    val_folds: [4]
+    test_folds: [5]
+
+preprocess:
+  sample_rate: 16000
+  mono: true
+  n_mels: 64
+  n_fft: 400
+  win_length: 400
+  hop_length: 160
+  to_db: true
+  normalize: "per_feature"
+
+augment:
+  enabled: true
+  freq_mask: {enabled: true, max_width: 8, num_masks: 1, p: 0.5}
+  time_mask: {enabled: true, max_width: 20, num_masks: 1, p: 0.5}
+  time_shift: {enabled: true, max_shift_pct: 0.05, p: 0.3}
+
+model:
+  type: "cnn2d_esc50"
+  channels: [32, 64, 128]
+  kernel_size: 3
+
+train:
+  seed: 42
+  batch_size: 64
+  num_workers: 0
+  lr: 1e-3
+  weight_decay: 1e-4
+
+paths:
+  runs_dir: "./runs"
+  artifacts_dir: "./artifacts"
+
 - **Commandes exactes** :
+# Entraînement final
+python -m src.train --config configs/final.yaml --max_epochs 15 --seed 42
+
+# Évaluation test
+python -m src.evaluate --config configs/final.yaml --checkpoint artifacts/best.ckpt
 
 ```bash
 # Exemple (remplacer par vos commandes effectives)
@@ -332,5 +431,10 @@ python -m src.evaluate --config configs/config.yaml --checkpoint artifacts/best.
 * PyTorch docs des modules utilisés (Conv2d, BatchNorm, ReLU, LSTM/GRU, transforms, etc.).
 * Lien dataset officiel (et/ou HuggingFace/torchvision/torchaudio).
 * Toute ressource externe substantielle (une ligne par référence).
+
+ESC-50 dataset (repo officiel Karol Piczak) : github.com/karolpiczak/ESC-50
+PyTorch : modules Conv2d, BatchNorm2d, ReLU, MaxPool2d, AdaptiveAvgPool2d, CrossEntropyLoss
+Torchaudio : MelSpectrogram, AmplitudeToDB (log-mel spectrogram)
+(Si tu mentionnes SpecAugment plus tard : paper/implémentation torchaudio ou référence courte)
 
 
