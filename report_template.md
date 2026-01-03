@@ -313,10 +313,25 @@ En passant de WD=1e-5 à WD=1e-4, le train converge légèrement moins vite mais
 
 ## 8) Itération supplémentaire (si temps)
 
-- **Changement(s)** : `_____` (resserrage de grille, nouvelle valeur d’un hyperparamètre, etc.)
-- **Résultat** : `_____` (val metric, tendances des courbes)
+- **Changement(s)** :  augmentation capacité du modèle (channels [48,96,192] vs [32,64,128]) + ajustement optimisation (LR 1e-2, WD 1e-4), entraînement 25 époques.
+- **Résultat** : meilleur run = val acc 0.475, test = 0.4025 (vs baseline test 0.29). 
 
 **M8.** Décrivez cette itération, la motivation et le résultat.
+
+Cette itération vise à dépasser les performances précédentes (≈0.34 en validation et ≈0.29 en test) en entraînant plus longtemps et ajustant l’optimisation et la capacité. 
+Pour améliorer la fiabilité du modèle (accuracy validation/test jugées insuffisantes), j’ai mené une itération supplémentaire en modifiant des éléments : le budget d’entraînement (plus d’époques) et certains hyperparamètres (LR, weight decay, capacité du modèle via channels, tout en gardant le même pipeline de données). L’objectif était de tester une optimisation plus stable et, si nécessaire, une capacité légèrement plus élevée, afin d’obtenir une meilleure généralisation sans changer la nature du modèle ni le protocole de splits.
+
+Stratégie d’itération (objectif : augmenter l'accuracy de mon val et de mon val)
+- Rendre l’entraînement plus stable : baisser le LR (0.02 → 0.01 ou 0.005)
+- Régulariser un peu plus : WD 1e-4 (au lieu de 1e-5)
+- Entraîner plus longtemps : 25–30 époques (au lieu de 15)
+- logguer Macro-F1 en plus de l’accuracy.
+
+Résultats sur TensorBoard: 
+![alt text](image-16.png)
+![alt text](image-17.png)
+
+Courbes : val_accuracy monte plus haut, val_loss plus bas, généralisation améliorée.
 
 ---
 

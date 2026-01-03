@@ -1,0 +1,71 @@
+dataset:
+  name: "ESC-50"
+  root: "./data/esc50"
+  annotation_csv: "./data/esc50/meta/esc50.csv"
+  audio_dir: "./data/esc50/audio"
+  split:
+    train_folds: [1, 2, 3]
+    val_folds: [4]
+    test_folds: [5]
+
+preprocess:
+  sample_rate: 16000
+  mono: true
+  n_mels: 64
+  n_fft: 400
+  win_length: 400
+  hop_length: 160
+  to_db: true
+  normalize: "per_feature"
+
+augment:
+  enabled: true
+  freq_mask:
+    enabled: true
+    max_width: 8
+    num_masks: 1
+    p: 0.5
+  time_mask:
+    enabled: true
+    max_width: 20
+    num_masks: 1
+    p: 0.5
+  time_shift:
+    enabled: true
+    max_shift_pct: 0.05
+    p: 0.3
+
+model:
+  channels: [32, 64, 128]
+  kernel_size: 5
+
+train:
+  seed: 42
+  batch_size: 64
+  num_workers: 0
+  lr: 5.0e-3
+  weight_decay: 1.0e-4
+
+metrics:
+  main: "accuracy"
+
+paths:
+  runs_dir: "./runs"
+  artifacts_dir: "./artifacts/iter8_runA"
+
+lr_finder:
+  lr_start: 1e-6
+  lr_end: 1.0
+  num_iters: 200
+
+grid_search:
+  epochs: 3
+  seed: 42
+
+hparams:
+  lr: [5.0e-3, 1.0e-2, 2.0e-2]
+  weight_decay: [1.0e-5, 1.0e-4]
+  channels:
+    - [32, 64, 128]
+    - [48, 96, 192]
+  kernel_size: [3, 5]

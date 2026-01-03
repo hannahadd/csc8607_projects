@@ -18,6 +18,26 @@ from src.data_loading import get_dataloaders
 from src.model import build_model
 
 
+def _confusion_matrix_from_preds(targets: torch.Tensor, preds: torch.Tensor, num_classes: int) -> torch.Tensor:
+    # targets, preds: (N,) int64 on CPU
+    idx = targets * num_classes + preds
+    cm = torch.bincount(idx, minlength=num_classes * num_classes).reshape(num_classes, num_classes)
+    return cm
+
+
+def macro_f1_from_cm(cm: torch.Tensor, eps: float = 1e-12) -> float:
+    # cm: (C, C) where rows=true, cols=pred
+    tp = torch.diag(cm).float()
+    fp = cm.sum(dim=0).float() - tp
+    fn = cm.sum(dim=1).float() - tp
+
+    precision = tp / (tp + fp + eps)
+    recall = tp / (tp + fn + eps)
+    f1 = 2 * precision * recall / (precision + recall + eps)
+
+    return float(f1.mean().item())
+
+
 def get_device() -> torch.device:
     if torch.cuda.is_available():
         return torch.device("cuda")
@@ -40,7 +60,6 @@ def _extract_state_dict(ckpt_obj):
                 state = ckpt_obj[k]
                 break
 
-    # If it's still a dict but not a state_dict, try best effort
     if not isinstance(state, dict):
         raise ValueError("Checkpoint format not recognized: expected a state_dict or a dict containing one.")
 
@@ -52,27 +71,52 @@ def _extract_state_dict(ckpt_obj):
 
 
 @torch.no_grad()
-def evaluate(model, loader, device, criterion):
+def evaluate(model, loader, device, criterion, num_classes: int):
     model.eval()
     total_loss = 0.0
-    correct = 0
     total = 0
+
+    # Pour macro-F1 (via matrice de confusion)
+    cm_total = torch.zeros((num_classes, num_classes), dtype=torch.int64)  # CPU
+
+    # Pour top-5 accuracy
+    top5_correct = 0
+
+    # Pour top-1 accuracy
+    correct = 0
 
     for xb, yb in loader:
         xb = xb.to(device)
         yb = yb.to(device)
 
-        logits = model(xb)
+        logits = model(xb)  # (B, C)
         loss = criterion(logits, yb)
 
-        total_loss += float(loss) * xb.size(0)
-        preds = logits.argmax(dim=1)
-        correct += int((preds == yb).sum())
-        total += int(xb.size(0))
+        bs = xb.size(0)
+        total_loss += loss.item() * bs
+        total += bs
+
+        # top-1 preds
+        preds = logits.argmax(dim=1)  # (B,)
+        correct += int((preds == yb).sum().item())
+
+        # confusion matrix (CPU)
+        cm_total += _confusion_matrix_from_preds(
+            targets=yb.detach().cpu().long(),
+            preds=preds.detach().cpu().long(),
+            num_classes=num_classes,
+        )
+
+        # top-5 accuracy
+        top5 = logits.topk(5, dim=1).indices  # (B, 5)
+        top5_correct += int((top5 == yb.unsqueeze(1)).any(dim=1).sum().item())
 
     avg_loss = total_loss / max(total, 1)
     acc = correct / max(total, 1)
-    return avg_loss, acc, total
+    f1_macro = macro_f1_from_cm(cm_total)
+    top5_acc = top5_correct / max(total, 1)
+
+    return avg_loss, acc, f1_macro, top5_acc, total
 
 
 def main():
@@ -105,9 +149,14 @@ def main():
 
     criterion = nn.CrossEntropyLoss()
 
-    test_loss, test_acc, n = evaluate(model, test_loader, device, criterion)
+    test_loss, test_acc, test_f1_macro, test_top5_acc, n = evaluate(
+        model, test_loader, device, criterion, num_classes=meta["num_classes"]
+    )
+
     print(f"test_loss: {test_loss:.4f}")
     print(f"test_accuracy: {test_acc:.4f}")
+    print(f"test_f1_macro: {test_f1_macro:.4f}")
+    print(f"test_top5_accuracy: {test_top5_acc:.4f}")
 
 
 if __name__ == "__main__":
