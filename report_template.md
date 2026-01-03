@@ -25,7 +25,7 @@
 ## 1) Données
 
 ### 1.1 Description du dataset
-- **Source** (lien) :
+- **Source** (lien) : https://github.com/karoldvl/ESC-50/archive/master.zip
 - **Type d’entrée** (image / texte / audio / séries) : audio (fichiers WAV) transformé en spectrogramme log-mel (traité comme une image)
 - **Tâche** (multiclasses, multi-label, régression) : classification multiclasses (50 classes)
 - **Dimensions d’entrée attendues** (`meta["input_shape"]`) : (1, 64, T)
